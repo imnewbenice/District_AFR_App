@@ -5,21 +5,6 @@ import os
 
 st.title("District AFR Data Extractor and Template Filler")
 
-# Define the cell mappings based on the provided template layout
-cell_mapping = {
-    "E11": "Regular Education", "G11": "Regular Education",
-    "E12": "Special Education", "G12": "Special Education",
-    "E13": "Pupil Transportation", "G13": "Pupil Transportation",
-    "E14": "Desegregation", "G14": "Desegregation",
-    "E15": "Dropout Prevention Programs", "G15": "Dropout Prevention Programs",
-    "E16": "Joint Career & Tech. Ed. & Voc. Ed. Center", "G16": "Joint Career & Tech. Ed. & Voc. Ed. Center",
-    "E17": "K-3 Reading Program", "G17": "K-3 Reading Program", "I17": "General",
-    # Add all other cells according to the provided template up to B69 and I69
-    "B18": "Maintenance and Operation Total", "C18": "Maintenance and Operation Total", "D18": "Maintenance and Operation Total",
-    "E18": "Maintenance and Operation Total", "G18": "Maintenance and Operation Total", "I18": "Special Revenue",
-    # ... (extend this for each row and cell in the provided template)
-}
-
 # Upload AFR files and the template file
 afr_files = st.file_uploader("Upload AFR Workbooks (2017-2024)", type="xlsx", accept_multiple_files=True)
 template_file = st.file_uploader("Upload AFR Summary Template", type="xlsx")
@@ -32,7 +17,8 @@ if st.button("Start Processing") and afr_files and template_file:
     
     # Load the template workbook to populate with data
     template_wb = load_workbook(template_file, data_only=True)
-    
+    template_sheet = template_wb.active  # Use the first sheet in the template as base
+
     # Initialize a new workbook to store filled templates
     output_wb = Workbook()
     output_wb.remove(output_wb.active)  # Remove the default blank sheet
@@ -49,22 +35,20 @@ if st.button("Start Processing") and afr_files and template_file:
         if "Summary" in afr_wb.sheetnames:
             afr_summary_sheet = afr_wb["Summary"]
             
-            # Create a copy of the template sheet to populate for this AFR file
+            # Create a new sheet in the output workbook named after the AFR file
             new_sheet = output_wb.create_sheet(title=file_name)
-            template_sheet = template_wb.active  # Use the first sheet in the template as base
 
-            # Copy the entire template sheet structure to the new sheet
+            # Copy the entire template structure to the new sheet
             for row in template_sheet.iter_rows():
                 for cell in row:
+                    # Copy each cell's value from the template to the new sheet
                     new_sheet[cell.coordinate].value = cell.value
 
-            # Populate the new sheet with extracted data
-            for cell_ref, description in cell_mapping.items():
-                # Extract value from the specified cell in the AFR's "Summary" sheet
-                if cell_ref in afr_summary_sheet:
-                    cell_value = afr_summary_sheet[cell_ref].value
-                    if cell_value is not None:
-                        new_sheet[cell_ref] = cell_value
+                    # Check if the cell in the template contains a reference to replace
+                    if isinstance(cell.value, str) and cell.value in afr_summary_sheet:
+                        # Replace the reference with actual data from the AFR summary sheet
+                        cell_value = afr_summary_sheet[cell.value].value
+                        new_sheet[cell.coordinate].value = cell_value  # Replace with actual data
 
         # Update progress bar after processing each file
         progress_bar.progress((i + 1) / total_files)
